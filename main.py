@@ -1,1 +1,4 @@
-#This will be the first push to remote repo 
+from gui.gui import Window
+
+win = Window(800, 600)
+win.wait_for_close()
