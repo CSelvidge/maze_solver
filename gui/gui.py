@@ -1,6 +1,7 @@
 from tkinter import LEFT,Tk, BOTH, Canvas, Button, Frame, simpledialog, Label
 import random
 import cProfile
+import pstats
 import time
 
 class Window:
@@ -23,7 +24,7 @@ class Window:
         button_frame = Frame(self.__root)
         button_frame.pack(pady=10)
 
-        populate_button = Button(button_frame, text="Populate Canvas", command= self.populate_canvas)
+        populate_button = Button(button_frame, text="Populate Canvas", command= self.profiling_tests)
         populate_button.pack(side = LEFT, padx=5)
 
         clear_button = Button(button_frame, text="Clear Canvas", command=self.clear_canvas)
@@ -96,7 +97,18 @@ class Window:
         self.update_timing_label()
 
     def profiling_tests(self) -> None:
-        cProfile.runctx('self.populate_canvas()', globals(), locals(), filename='db.prof')
+        #cProfile.runctx('self.populate_canvas()', globals(), locals(), filename='db.prof') #No longer saving directly to file, switching to displaying results after each run to console
+
+        pr = cProfile.Profile()
+        pr.enable()
+
+        self.populate_canvas()
+
+        pr.disable()
+
+        stats = pstats.Stats(pr)
+
+        stats.sort_stats(pstats.SortKey.TIME).print_stats(10)
 
     def populate_cells(self, num_rows, num_cols) -> None:
         self.cells = [
@@ -179,7 +191,12 @@ class Line:
 
 class Cell:
     def __init__(self, x1, y1, x2, y2, win) -> None:
-        self.walls = {}
+        self.walls = {
+            'top': True,
+            'right': True,
+            'bottom': True,
+            'left': True
+        }
 
         self._x1 = x1
         self._x2 = x2
@@ -187,6 +204,16 @@ class Cell:
         self._y2 = y2
 
         self._win = win
+
+        self.cached_wall_coords = self._cache_wall_coordinates()
+
+    def _cache_wall_coordinates(self) -> None:
+        return {
+            'top': (self._x1, self._y1, self._x2, self._y1),
+            'right': (self._x2, self._y1, self._x2, self._y2),
+            'bottom': (self._x1, self._y2, self._x2, self._y2),
+            'left': (self._x1, self._y1, self._x1, self._y2)
+        }
 
     def draw_walls(self, drawn_walls) -> list:
         walls_to_draw = []
@@ -196,18 +223,44 @@ class Cell:
         bottom_wall = ((self._x1, self._y2), (self._x1, self._y2))
         left_wall = ((self._x1, self._y1), (self._x1, self._y2))
 
-        if self.walls.get('top') and top_wall not in drawn_walls:
-            walls_to_draw.append((Point(self._x1, self._y1), Point(self._x2, self._y1)))
-            drawn_walls.add(top_wall)
-        if self.walls.get('right') and right_wall not in drawn_walls:
-            walls_to_draw.append((Point(self._x2, self._y1), Point(self._x2, self._y2)))
-            drawn_walls.add(right_wall)
-        if self.walls.get('bottom') and bottom_wall not in drawn_walls:
-            walls_to_draw.append((Point(self._x1, self._y2), Point(self._x2, self._y2)))
-            drawn_walls.add(bottom_wall)
-        if self.walls.get('left') and left_wall not in drawn_walls:
-            walls_to_draw.append((Point(self._x1, self._y1), Point(self._x1, self._y2)))
-            drawn_walls.add(left_wall)
+
+        if self.walls['top']:
+            top_wall = self.cached_wall_coords['top']
+            if top_wall not in drawn_walls:
+                walls_to_draw.append((Point(*top_wall[:2]), Point(*top_wall[2:])))
+                drawn_walls.add(top_wall)
+        if self.walls['right']:
+            right_wall = self.cached_wall_coords['right']
+            if right_wall not in drawn_walls:
+                walls_to_draw.append((Point(*right_wall[:2]), Point(*right_wall[2:])))
+                drawn_walls.add(right_wall)
+        if self.walls['bottom']:
+            bottom_wall = self.cached_wall_coords['bottom']
+            if bottom_wall not in drawn_walls:
+                walls_to_draw.append((Point(*bottom_wall[:2]), Point(*bottom_wall[2:])))
+                drawn_walls.add(bottom_wall)
+        if self.walls['left']:
+            left_wall = self.cached_wall_coords['left']
+            if left_wall not in drawn_walls:
+                walls_to_draw.append((Point(*left_wall[:2]), Point(*left_wall[2:])))
+                drawn_walls.add(left_wall)
+
+
+
+        #Non Cached version
+
+#        if self.walls.get('top') and top_wall not in drawn_walls:
+#            walls_to_draw.append((Point(self._x1, self._y1), Point(self._x2, self._y1)))
+#            drawn_walls.add(top_wall)
+#        if self.walls.get('right') and right_wall not in drawn_walls:
+#            walls_to_draw.append((Point(self._x2, self._y1), Point(self._x2, self._y2)))
+#            drawn_walls.add(right_wall)
+#        if self.walls.get('bottom') and bottom_wall not in drawn_walls:
+#            walls_to_draw.append((Point(self._x1, self._y2), Point(self._x2, self._y2)))
+#            drawn_walls.add(bottom_wall)
+#        if self.walls.get('left') and left_wall not in drawn_walls:
+#            walls_to_draw.append((Point(self._x1, self._y1), Point(self._x1, self._y2)))
+#            drawn_walls.add(left_wall)
 
         return walls_to_draw
 
