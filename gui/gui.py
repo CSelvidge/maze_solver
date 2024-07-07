@@ -1,11 +1,12 @@
 from tkinter import LEFT,Tk, BOTH, Canvas, Button, Frame, simpledialog, Label
 import random
 import cProfile
+import time
 
 class Window:
     def __init__(self, width, height, cell_size = None, batch_size = 100):
         self.__root = Tk()
-        self.__root.title("Maze Solver V 0.1")
+        self.__root.title("Maze Solver V 0.2")
         self.__canvas = Canvas(self.__root, width=width, height=height)
         self.__canvas.pack(fill=BOTH, expand=True)
         self.__running = False
@@ -22,7 +23,7 @@ class Window:
         button_frame = Frame(self.__root)
         button_frame.pack(pady=10)
 
-        populate_button = Button(button_frame, text="Populate Canvas", command= self.profiling_tests)
+        populate_button = Button(button_frame, text="Populate Canvas", command= self.populate_canvas)
         populate_button.pack(side = LEFT, padx=5)
 
         clear_button = Button(button_frame, text="Clear Canvas", command=self.clear_canvas)
@@ -41,11 +42,17 @@ class Window:
         self.cell_size_label = Label(self.__root, text="Cell Size:")
         self.cell_size_label.pack(side=LEFT, padx=5)
 
+        self.timing_label = Label(self.__root, text="Time to Populate:")
+        self.timing_label.pack(side=LEFT, padx=5)
+
     def update_count_label(self) -> None:
         self.count_label.config(text=f"Cell Count: {self.cell_count}")
 
     def update_cell_size_label(self) -> None:
         self.cell_size_label.config(text=f"Cell Size: {self.cell_size}")
+
+    def update_timing_label(self) -> None:
+        self.timing_label.config(text=f"Time to Populate: {self.duration}")
 
     def calculate_grid_size(self) -> None:
         if self.cell_size is None:
@@ -77,11 +84,16 @@ class Window:
         self.batch_size = batch_size
 
     def populate_canvas(self) -> None:
+        start_time = time.time()
         self.clear_canvas()
         if self.cell_size is None or self.cell_size < 1:
             self.set_cell_size(simpledialog.askinteger("Input", "Enter cell size(in pixels):", minvalue = 1))
         self.cell_geometry = self.calculate_grid_size()
         self.cells = self.populate_cells(self.cell_geometry[0], self.cell_geometry[1])
+
+        end_time = time.time()
+        self.duration = end_time - start_time
+        self.update_timing_label()
 
     def profiling_tests(self) -> None:
         cProfile.runctx('self.populate_canvas()', globals(), locals(), filename='db.prof')
