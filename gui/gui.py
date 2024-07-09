@@ -7,7 +7,7 @@ import time
 class Window:
     def __init__(self, width, height, cell_size = None, batch_size = 100):
         self.__root = Tk()
-        self.__root.title("Maze Solver V 0.2")
+        self.__root.title("Maze Solver V 0.3")
         self.__canvas = Canvas(self.__root, width=width, height=height)
         self.__canvas.pack(fill=BOTH, expand=True)
         self.__running = False
@@ -24,17 +24,9 @@ class Window:
         button_frame = Frame(self.__root)
         button_frame.pack(pady=10)
 
-        populate_button = Button(button_frame, text="Populate Canvas", command= self.profiling_tests)
-        populate_button.pack(side = LEFT, padx=5)
-
-        clear_button = Button(button_frame, text="Clear Canvas", command=self.clear_canvas)
-        clear_button.pack(side=LEFT, padx=5)
-
-        cell_size_button = Button(button_frame, text="Cell Size", command=self.user_cell_size)
-        cell_size_button.pack(side=LEFT, padx=5)
-
-        batch_size_button = Button(button_frame, text="Set Batch Size", command=self.user_batch_size)
-        batch_size_button.pack(side=LEFT, padx=5)
+        Button(button_frame, text="Populate Canvas", command=self.profiling_tests).pack(side=LEFT, padx=5)
+        Button(button_frame, text="Clear Canvas", command=self.clear_canvas).pack(side=LEFT, padx=5)
+        Button(button_frame, text="Cell Size", command=self.user_cell_size).pack(side=LEFT, padx=5)
 
     def create_labels(self) -> None:
         self.count_label = Label(self.__root, text="Cell count:")
@@ -55,7 +47,7 @@ class Window:
     def update_timing_label(self) -> None:
         self.timing_label.config(text=f"Time to Populate: {self.duration}")
 
-    def calculate_grid_size(self) -> None:
+    def calculate_grid_size(self) -> tuple:
         if self.cell_size is None:
             raise ValueError("Cell size is not defined")
         
@@ -108,9 +100,9 @@ class Window:
 
         stats = pstats.Stats(pr)
 
-        stats.sort_stats(pstats.SortKey.TIME).print_stats(10)
+        stats.sort_stats(pstats.SortKey.TIME).print_stats(25)
 
-    def populate_cells(self, num_rows, num_cols) -> None:
+    def populate_cells(self, num_rows, num_cols) -> list:
         self.cells = [
             [
                 self.create_randomized_cell(col, row)
@@ -126,6 +118,8 @@ class Window:
         self.__root.update_idletasks()
         self.__root.update() 
 
+        return self.cells
+
     def create_randomized_cell(self, col, row) -> 'Cell':
         x1 = col * self.cell_size
         y1 = row * self.cell_size
@@ -133,43 +127,41 @@ class Window:
         y2 = y1 + self.cell_size
         cell = Cell(x1, y1, x2, y2, self)
 
+
+        walls_state = random.getrandbits(4)
+
         cell.walls = {
-            'top': random.choice([True,False]),
-            'right': random.choice([True,False]),
-            'bottom': random.choice([True,False]),
-            'left': random.choice([True,False])
+            'top': bool(walls_state & 1),
+            'right': bool(walls_state & 2),
+            'bottom': bool(walls_state & 4),
+            'left': bool(walls_state & 8)
         }
 
         return cell
     
     def draw_all_walls(self) -> None:
         drawn_walls = set()
-        lines_to_draw = []
 
         for row in self.cells:
             for cell in row:
-                lines_to_draw.extend(cell.draw_walls(drawn_walls))
-        
-        self.draw_lines(lines_to_draw)
+                lines_to_draw = cell.draw_walls(drawn_walls)
+                for start, end in lines_to_draw:
+                    self.__canvas.create_line(start.x, start.y, end.x, end.y, fill="black", width=2)
 
-    def redraw(self):
+    def redraw(self) -> None:
         self.__root.update_idletasks()
         self.__root.update()
 
-    def wait_for_close(self):
+    def wait_for_close(self)-> None:
         self.__running = True
         while self.__running:
             self.redraw()
 
-    def close(self):
+    def close(self) -> None:
         self.__running = False
         self.__root.destroy()
 
-    def draw_lines(self, lines:list) -> None:
-        for start, end in lines:
-            self.draw_line(Line(start, end), "black")
-
-    def draw_line(self, line, fill_color):
+    def draw_line(self, line, fill_color) -> 'Line':
         line.draw(self.__canvas, fill_color)
         return line
 
@@ -190,87 +182,39 @@ class Line:
 
 
 class Cell:
-    def __init__(self, x1, y1, x2, y2, win) -> None:
-        self.walls = {
-            'top': True,
-            'right': True,
-            'bottom': True,
-            'left': True
-        }
-
+    def __init__(self, x1, y1, x2, y2, win):
+        self.walls = {}
+        
         self._x1 = x1
         self._x2 = x2
         self._y1 = y1
         self._y2 = y2
-
         self._win = win
-
         self.cached_wall_coords = self._cache_wall_coordinates()
 
-    def _cache_wall_coordinates(self) -> None:
+    def _cache_wall_coordinates(self):
         return {
-            'top': (self._x1, self._y1, self._x2, self._y1),
-            'right': (self._x2, self._y1, self._x2, self._y2),
-            'bottom': (self._x1, self._y2, self._x2, self._y2),
-            'left': (self._x1, self._y1, self._x1, self._y2)
+            'top': (Point(self._x1, self._y1), Point(self._x2, self._y1)),
+            'right': (Point(self._x2, self._y1), Point(self._x2, self._y2)),
+            'bottom': (Point(self._x1, self._y2), Point(self._x2, self._y2)),
+            'left': (Point(self._x1, self._y1), Point(self._x1, self._y2))
         }
 
     def draw_walls(self, drawn_walls) -> list:
-        walls_to_draw = []
+        lines_to_draw = []
 
-        top_wall = ((self._x1, self._y1), (self._x2, self._y1))
-        right_wall = ((self._x2, self._y1), (self._x2, self._y2))
-        bottom_wall = ((self._x1, self._y2), (self._x1, self._y2))
-        left_wall = ((self._x1, self._y1), (self._x1, self._y2))
+        for direction in ['top', 'right', 'bottom', 'left']:
+            wall_coords = self.cached_wall_coords[direction]
+            if self.walls[direction] and wall_coords not in drawn_walls:
+                drawn_walls.add(wall_coords)
+                lines_to_draw.append(wall_coords)
+        
+        return lines_to_draw
 
+    def draw_move(self, to_cell, undo=False) -> None:
+        draw_color = "gray" if undo else "red"
 
-        if self.walls['top']:
-            top_wall = self.cached_wall_coords['top']
-            if top_wall not in drawn_walls:
-                walls_to_draw.append((Point(*top_wall[:2]), Point(*top_wall[2:])))
-                drawn_walls.add(top_wall)
-        if self.walls['right']:
-            right_wall = self.cached_wall_coords['right']
-            if right_wall not in drawn_walls:
-                walls_to_draw.append((Point(*right_wall[:2]), Point(*right_wall[2:])))
-                drawn_walls.add(right_wall)
-        if self.walls['bottom']:
-            bottom_wall = self.cached_wall_coords['bottom']
-            if bottom_wall not in drawn_walls:
-                walls_to_draw.append((Point(*bottom_wall[:2]), Point(*bottom_wall[2:])))
-                drawn_walls.add(bottom_wall)
-        if self.walls['left']:
-            left_wall = self.cached_wall_coords['left']
-            if left_wall not in drawn_walls:
-                walls_to_draw.append((Point(*left_wall[:2]), Point(*left_wall[2:])))
-                drawn_walls.add(left_wall)
-
-
-
-        #Non Cached version
-
-#        if self.walls.get('top') and top_wall not in drawn_walls:
-#            walls_to_draw.append((Point(self._x1, self._y1), Point(self._x2, self._y1)))
-#            drawn_walls.add(top_wall)
-#        if self.walls.get('right') and right_wall not in drawn_walls:
-#            walls_to_draw.append((Point(self._x2, self._y1), Point(self._x2, self._y2)))
-#            drawn_walls.add(right_wall)
-#        if self.walls.get('bottom') and bottom_wall not in drawn_walls:
-#            walls_to_draw.append((Point(self._x1, self._y2), Point(self._x2, self._y2)))
-#            drawn_walls.add(bottom_wall)
-#        if self.walls.get('left') and left_wall not in drawn_walls:
-#            walls_to_draw.append((Point(self._x1, self._y1), Point(self._x1, self._y2)))
-#            drawn_walls.add(left_wall)
-
-        return walls_to_draw
-
-    def draw_move(self, cell, undo: bool = False) -> None:
-        if undo:
-            self._draw_color = "gray"
-        else:
-            self._draw_color = "red"
-
-        self._center = Point(((self._x1 + self._x2) / 2), (self._y1 + self._y2) / 2)
-        _cell_center = Point(((cell._x1 + cell._x2) / 2), (cell._y1 + cell._y2) / 2)
-        line = Line(self._center, _cell_center)
-        self._win.draw_line(line, self.__draw_color)       
+        self_center = Point((self._x1 + self._x2) / 2, (self._y1 + self._y2) / 2)
+        cell_center = Point((to_cell._x1 + to_cell._x2) / 2, (to_cell._y1 + to_cell._y2) / 2)
+        line = Line(self_center, cell_center)
+        self._win.draw_line(line, draw_color)
