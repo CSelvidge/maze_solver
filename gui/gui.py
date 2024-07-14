@@ -29,13 +29,13 @@ class Window:
         Button(button_frame, text="Cell Size", command=self.user_cell_size).pack(side=LEFT, padx=5)
 
     def create_labels(self) -> None:
-        self.count_label = Label(self.__root, text="Cell count:")
+        self.count_label = Label(self.__root, text="Cell count: N/A")
         self.count_label.pack(side=LEFT, padx=5)
 
-        self.cell_size_label = Label(self.__root, text="Cell Size:")
+        self.cell_size_label = Label(self.__root, text="Cell Size: N/A")
         self.cell_size_label.pack(side=LEFT, padx=5)
 
-        self.timing_label = Label(self.__root, text="Time to Populate:")
+        self.timing_label = Label(self.__root, text="Time to Populate: N/A")
         self.timing_label.pack(side=LEFT, padx=5)
 
     def update_count_label(self) -> None:
@@ -58,7 +58,7 @@ class Window:
         num_rows = canvas_height // self.cell_size
 
         return num_rows, num_cols
-    
+
     def clear_canvas(self) -> None:
         self.__canvas.delete("all")
         self.cells = []
@@ -115,8 +115,6 @@ class Window:
 
         self.draw_all_walls()
 
-        self.__root.update_idletasks()
-        self.__root.update() 
 
         return self.cells
 
@@ -141,12 +139,19 @@ class Window:
     
     def draw_all_walls(self) -> None:
         drawn_walls = set()
+        line_segments =[]
 
         for row in self.cells:
             for cell in row:
                 lines_to_draw = cell.draw_walls(drawn_walls)
-                for start, end in lines_to_draw:
-                    self.__canvas.create_line(start.x, start.y, end.x, end.y, fill="black", width=2)
+                line_segments.extend(lines_to_draw)
+                
+                
+        for start, end in line_segments:
+            self.__canvas.create_line(start.x, start.y, end.x, end.y, fill="black", width=2)
+
+        self.__root.update_idletasks()
+        self.__root.update()
 
     def redraw(self) -> None:
         self.__root.update_idletasks()
@@ -190,21 +195,18 @@ class Cell:
         self._y1 = y1
         self._y2 = y2
         self._win = win
-        self.cached_wall_coords = self._cache_wall_coordinates()
-
-    def _cache_wall_coordinates(self):
-        return {
-            'top': (Point(self._x1, self._y1), Point(self._x2, self._y1)),
-            'right': (Point(self._x2, self._y1), Point(self._x2, self._y2)),
-            'bottom': (Point(self._x1, self._y2), Point(self._x2, self._y2)),
-            'left': (Point(self._x1, self._y1), Point(self._x1, self._y2))
-        }
 
     def draw_walls(self, drawn_walls) -> list:
         lines_to_draw = []
 
-        for direction in ['top', 'right', 'bottom', 'left']:
-            wall_coords = self.cached_wall_coords[direction]
+        walls = {
+            "top": (Point(self._x1, self._y1), Point(self._x2, self._y1)),
+            "right": (Point(self._x2, self._y1), Point(self._x2, self._y2)),
+            "bottom": (Point(self._x1, self._y2), Point(self._x2, self._y2)),
+            "left": (Point(self._x1, self._y1), Point(self._x1, self._y2)),
+        }        
+
+        for direction, wall_coords in walls.items():
             if self.walls[direction] and wall_coords not in drawn_walls:
                 drawn_walls.add(wall_coords)
                 lines_to_draw.append(wall_coords)
