@@ -139,7 +139,7 @@ class Window:
     
     def draw_all_walls(self) -> None:
         drawn_walls = set()
-        line_segments =[]
+        line_segments = []
 
         for row in self.cells:
             for cell in row:
